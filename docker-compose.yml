@@ -1,11 +1,11 @@
 version: '3'
 
 services:
-    pmcaptcha:
-        container_name: pmcaptcha
+    mathcaptcha:
+        container_name: mathcaptcha
         build: .
         ports:
             - "5000:5000"
         restart: unless-stopped
         volumes:
-            - ./images:/app/images
+            - ./images:/app/images    
