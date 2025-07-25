@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+    mathcaptcha:
+        container_name: mathcaptcha
+        build: .
+        ports:
+            - "5000:5000"
+        restart: unless-stopped
+        volumes:
+            - ./images:/app/images    
