@@ -5,3 +5,4 @@ torch
 Pillow
 opencv-python
 requests
+pytesseract

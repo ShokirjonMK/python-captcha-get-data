@@ -8,4 +8,4 @@ services:
             - "5000:5000"
         restart: unless-stopped
         volumes:
-            - ./images:/app/images    
+            - ./images:/app/images
