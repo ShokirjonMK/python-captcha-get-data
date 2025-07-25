@@ -3,6 +3,7 @@ from PIL import Image, ImageEnhance, ImageFilter
 import pytesseract
 from io import BytesIO
 import re
+import os
 import datetime
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
@@ -24,6 +25,8 @@ REPLACEMENTS = {
 }
 
 
+IMAGE_DIR = "images"  # Rasmlar saqlanadigan papka
+
 def download_and_process_image(url: str) -> Image.Image:
     response = requests.get(url)
     image = Image.open(BytesIO(response.content)).convert("L")
@@ -31,13 +34,15 @@ def download_and_process_image(url: str) -> Image.Image:
     image = image.filter(ImageFilter.SHARPEN)
     image = ImageEnhance.Contrast(image).enhance(3)
 
+    # 📂 Rasmni saqlash uchun papka yaratish
+    os.makedirs(IMAGE_DIR, exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = f"captcha_debug_{timestamp}.jpg"
+    filename = os.path.join(IMAGE_DIR, f"captcha_{timestamp}.jpg")
     image.save(filename)
     print(f"📷 CAPTCHA saqlandi: {filename}")
 
     return image
-
+    
 
 def extract_text(image: Image.Image) -> str:
     raw_text = pytesseract.image_to_string(image, config="--psm 7")
