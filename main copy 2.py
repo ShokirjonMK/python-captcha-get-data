@@ -9,7 +9,10 @@ from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
-MAIN_URL = "https://pm.gov.uz"
+MAIN_URL_DTM = "https://my.uzbmb.uz"
+MAIN_URL_PM = "https://my.uzbmb.uz"
+CAPTCHA_URL_DTM = f"{MAIN_URL_DTM}/uz/site/captcha?v=688323046add4"
+CAPTCHA_URL_PM = f"{MAIN_URL_PM}/uz/site/captcha?v=688323046add4"
 
 REPLACEMENTS = {
     '{': '2', '(': '2', '[': '2',
@@ -65,46 +68,54 @@ def evaluate_expression(text: str):
     return None
 
 
-@app.get("/verify-person")
-def verify_person(
-    passport_seria: str = Query(..., min_length=2, max_length=2),
-    passport_number: str = Query(..., min_length=5),
-    birth_date: str = Query(..., regex=r"\d{2}\.\d{2}\.\d{4}")
+@app.get("/solve-captcha")
+def solve_captcha():
+    try:
+        image = download_and_process_image(CAPTCHA_URL_DTM)
+        raw = extract_text(image)
+        cleaned = clean_text(raw)
+        result = evaluate_expression(cleaned)
+        if result is not None:
+            return JSONResponse(content={"text": "topildi", "code": result})
+        else:
+            return JSONResponse(content={"text": "topilmadi", "code": None})
+    except Exception as e:
+        return JSONResponse(content={"text": "xatolik", "error": str(e)})
+
+
+@app.get("/get-data")
+def get_data(
+    seria: str = Query(..., min_length=2, max_length=2),
+    raqam: str = Query(..., min_length=6, max_length=7),
+    sana: str = Query(..., regex=r"\d{2}\.\d{2}\.\d{4}")  # Format: DD.MM.YYYY
 ):
     try:
-        # 1-qadam: CAPTCHA ni yechish
-        captcha_url = f"{MAIN_URL}/uz/site/captcha"
-        image = download_and_process_image(captcha_url)
+        # 1-qadam: CAPTCHA ni hal qilish
+        image = download_and_process_image(CAPTCHA_URL_PM)
         raw = extract_text(image)
         cleaned = clean_text(raw)
         code = evaluate_expression(cleaned)
 
         if code is None:
-            return JSONResponse(content={"text": "CAPTCHA topilmadi", "raw": raw, "cleaned": cleaned}, status_code=400)
+            return JSONResponse(content={"text": "captcha xato o'qildi"})
 
-        print(f"🔢 CAPTCHA natijasi: {code}")
-
-        # 2-qadam: ma'lumot yuborish
-        data_url = f"{MAIN_URL}/uz/api/gsp/person-data"
+        # 2-qadam: Ma’lumot yuborish
         payload = {
             "document_type": "passport",
-            "person_passport_seria": passport_seria,
-            "person_passport_number": passport_number,
-            "person_birth_date": birth_date,
-            "verify_code": code,
+            "person_passport_seria": seria,
+            "person_passport_number": raqam,
+            "person_birth_date": sana,
+            "verify_code": str(code),
             "is_consent": 1
         }
 
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Origin': 'https://pm.gov.uz',
-            'Referer': 'https://pm.gov.uz/uz',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
-            'Cookie': 'login_sessionPmGovUz=b3nvb3hbp6of6qf03fonk92hf3; _language=06b99ca738b40b8d759d6e14412dbf2a7e4750139d5846dcb9d04e71727be7b0a%3A2%3A%7Bi%3A0%3Bs%3A9%3A%22_language%22%3Bi%3A1%3Bs%3A2%3A%22uz%22%3B%7D; _csrf=245dda40f7c9d70987a2abbf7d7b480017a833c8d356c60f9eb28076e75b17fea%3A2%3A%7Bi%3A0%3Bs%3A5%3A%22_csrf%22%3Bi%3A1%3Bs%3A32%3A%221SoJaUpZd50s3nFRM4vd1BjU4fJkFNZe%22%3B%7D; smart_top=1; _language=06b99ca738b40b8d759d6e14412dbf2a7e4750139d5846dcb9d04e71727be7b0a%3A2%3A%7Bi%3A0%3Bs%3A9%3A%22_language%22%3Bi%3A1%3Bs%3A2%3A%22uz%22%3B%7D; login_sessionPmGovUz=88htmg596gmejv1b0jfnhaqots'
-        }
+        response = requests.post(
+            f"{MAIN_URL_PM}/uz/api/gsp/person-data",
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
 
-        response = requests.post(data_url, data=payload, headers=headers)
         return JSONResponse(content=response.json())
 
     except Exception as e:
-        return JSONResponse(content={"text": "xatolik", "error": str(e)}, status_code=500)
+        return JSONResponse(content={"text": "xatolik", "error": str(e)})
